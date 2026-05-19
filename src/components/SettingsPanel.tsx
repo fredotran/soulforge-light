@@ -1,3 +1,4 @@
+import { useKeyboard } from "@opentui/react";
 import { useState } from "react";
 import { saveConfig } from "../core/config/index.js";
 import { getTheme } from "../core/theme/index.js";
@@ -5,8 +6,8 @@ import { useAppStore } from "../stores/app.js";
 import { Box } from "./ui/box.js";
 import { Text } from "./ui/text.js";
 
-const PROVIDERS = ["anthropic", "openai", "google", "groq", "mistral", "deepseek"];
-const MODELS: Record<string, string[]> = {
+const PROVIDERS = ["anthropic", "openai", "google", "groq", "mistral", "deepseek"] as const;
+const MODELS: Record<(typeof PROVIDERS)[number], string[]> = {
   anthropic: ["claude-sonnet-4", "claude-opus-4", "claude-haiku-3"],
   openai: ["gpt-4o", "gpt-4o-mini", "o3-mini"],
   google: ["gemini-2.0-flash", "gemini-2.5-pro"],
@@ -18,94 +19,80 @@ const MODELS: Record<string, string[]> = {
 export function SettingsPanel() {
   const t = getTheme();
   const { closeSettings, theme, toggleTheme } = useAppStore();
-  const [activeTab, setActiveTab] = useState<"providers" | "theme" | "keys">("providers");
   const [provider, setProvider] = useState("anthropic");
   const [model, setModel] = useState("claude-sonnet-4");
   const [apiKey, _setApiKey] = useState("");
+  const [providerIdx, setProviderIdx] = useState(0);
 
-  const handleSave = () => {
-    saveConfig({ provider, model, apiKey, theme });
-    closeSettings();
-  };
+  useKeyboard((key) => {
+    if (key.eventType === "release") return;
+
+    if (key.name === "down") {
+      setProviderIdx((i) => {
+        const next = (i + 1) % PROVIDERS.length;
+        const p = PROVIDERS[next];
+        setProvider(p);
+        setModel(MODELS[p][0]);
+        return next;
+      });
+      key.stopPropagation();
+      return;
+    }
+    if (key.name === "up") {
+      setProviderIdx((i) => {
+        const next = (i - 1 + PROVIDERS.length) % PROVIDERS.length;
+        const p = PROVIDERS[next];
+        setProvider(p);
+        setModel(MODELS[p][0]);
+        return next;
+      });
+      key.stopPropagation();
+      return;
+    }
+    if (key.name === "return") {
+      saveConfig({ provider, model, apiKey, theme });
+      closeSettings();
+      key.stopPropagation();
+      return;
+    }
+    if (key.name === "t") {
+      toggleTheme();
+      key.stopPropagation();
+      return;
+    }
+  });
 
   return (
     <Box flexDirection="column" flexGrow={1}>
       <Box flexDirection="row" height={1} gap={2}>
-        {(["providers", "theme", "keys"] as const).map((tab) => (
-          <Box key={tab} onPress={() => setActiveTab(tab)}>
-            <Text color={activeTab === tab ? t.brand : t.textMuted} bold={activeTab === tab}>
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
-            </Text>
-          </Box>
-        ))}
+        <Text color={t.brand} bold>
+          Settings
+        </Text>
         <Box flexGrow={1} />
-        <Box onPress={closeSettings}>
-          <Text color={t.error}>[X]</Text>
-        </Box>
+        <Text color={t.error}>[X]</Text>
       </Box>
       <Box height={1} />
-      {activeTab === "providers" && (
-        <Box flexDirection="column" gap={1}>
-          <Text color={t.textSecondary}>Provider:</Text>
-          {PROVIDERS.map((p) => (
-            <Box
-              key={p}
-              onPress={() => {
-                setProvider(p);
-                setModel(MODELS[p]?.[0] ?? "");
-              }}
-            >
-              <Text color={provider === p ? t.brand : t.textMuted}>
-                {provider === p ? `● ${p}` : `○ ${p}`}
-              </Text>
-            </Box>
-          ))}
-          <Box height={1} />
-          <Text color={t.textSecondary}>Model:</Text>
-          {(MODELS[provider] ?? []).map((m) => (
-            <Box key={m} onPress={() => setModel(m)}>
-              <Text color={model === m ? t.brand : t.textMuted}>
-                {model === m ? `● ${m}` : `○ ${m}`}
-              </Text>
-            </Box>
-          ))}
-          <Box height={1} />
-          <Text color={t.textSecondary}>API Key:</Text>
-          <Text color={t.textMuted}>************</Text>
-          <Box height={1} />
-          <Box onPress={handleSave}>
-            <Text color={t.success}>[Save]</Text>
-          </Box>
-        </Box>
-      )}
-      {activeTab === "theme" && (
-        <Box flexDirection="column" gap={1}>
-          <Text color={t.textSecondary}>Theme:</Text>
-          <Box onPress={toggleTheme}>
-            <Text color={theme === "dark" ? t.brand : t.textMuted}>
-              {theme === "dark" ? "● Dark" : "○ Dark"}
-            </Text>
-          </Box>
-          <Box onPress={toggleTheme}>
-            <Text color={theme === "light" ? t.brand : t.textMuted}>
-              {theme === "light" ? "● Light" : "○ Light"}
-            </Text>
-          </Box>
-        </Box>
-      )}
-      {activeTab === "keys" && (
-        <Box flexDirection="column" gap={1}>
-          <Text color={t.textSecondary}>Keyboard shortcuts:</Text>
-          <Text color={t.textMuted}>^X — Quit</Text>
-          <Text color={t.textMuted}>^S — Save session</Text>
-          <Text color={t.textMuted}>^T — New tab</Text>
-          <Text color={t.textMuted}>^W — Close tab</Text>
-          <Text color={t.textMuted}>Tab — Next tab</Text>
-          <Text color={t.textMuted}>Shift+Tab — Previous tab</Text>
-          <Text color={t.textMuted}>^/ — Focus input</Text>
-          <Text color={t.textMuted}>Escape — Close overlay</Text>
-        </Box>
-      )}
+      <Text color={t.textSecondary}>Provider (↑/↓ to select):</Text>
+      {PROVIDERS.map((p, i) => (
+        <Text key={p} color={i === providerIdx ? t.brand : t.textMuted} bold={i === providerIdx}>
+          {i === providerIdx ? `> ${p}` : `  ${p}`}
+        </Text>
+      ))}
+      <Box height={1} />
+      <Text color={t.textSecondary}>Model: {model}</Text>
+      <Box height={1} />
+      <Text color={t.textSecondary}>Theme (press T to toggle):</Text>
+      <Text color={theme === "dark" ? t.brand : t.textMuted}>
+        {theme === "dark" ? "● Dark" : "○ Dark"}
+      </Text>
+      <Text color={theme === "light" ? t.brand : t.textMuted}>
+        {theme === "light" ? "● Light" : "○ Light"}
+      </Text>
+      <Box height={1} />
+      <Text color={t.textSecondary}>API Key:</Text>
+      <Text color={t.textMuted}>************</Text>
+      <Box height={1} />
+      <Text color={t.success}>[Enter to Save]</Text>
     </Box>
   );
 }
