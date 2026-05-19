@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Box } from "./ui/box.js";
-import { Text } from "./ui/text.js";
 import { getTheme } from "../core/theme/index.js";
 import type { Message } from "../types/index.js";
+import { Box } from "./ui/box.js";
+import { Text } from "./ui/text.js";
 
 export function ToolCallBlock({ message }: { message: Message }) {
   const t = getTheme();

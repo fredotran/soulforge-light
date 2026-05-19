@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { Box } from "./ui/box.js";
-import { Text } from "./ui/text.js";
+import { saveConfig } from "../core/config/index.js";
 import { getTheme } from "../core/theme/index.js";
 import { useAppStore } from "../stores/app.js";
-import { saveConfig } from "../core/config/index.js";
+import { Box } from "./ui/box.js";
+import { Text } from "./ui/text.js";
 
 const PROVIDERS = ["anthropic", "openai", "google", "groq", "mistral", "deepseek"];
 const MODELS: Record<string, string[]> = {
@@ -21,7 +21,7 @@ export function SettingsPanel() {
   const [activeTab, setActiveTab] = useState<"providers" | "theme" | "keys">("providers");
   const [provider, setProvider] = useState("anthropic");
   const [model, setModel] = useState("claude-sonnet-4");
-  const [apiKey, setApiKey] = useState("");
+  const [apiKey, _setApiKey] = useState("");
 
   const handleSave = () => {
     saveConfig({ provider, model, apiKey, theme });
@@ -56,7 +56,7 @@ export function SettingsPanel() {
               color={provider === p ? t.brand : t.textMuted}
               onPress={() => {
                 setProvider(p);
-                setModel(MODELS[p][0]);
+                setModel(MODELS[p]?.[0] ?? "");
               }}
             >
               {provider === p ? `● ${p}` : `○ ${p}`}
@@ -65,11 +65,7 @@ export function SettingsPanel() {
           <Box height={1} />
           <Text color={t.textSecondary}>Model:</Text>
           {(MODELS[provider] ?? []).map((m) => (
-            <Text
-              key={m}
-              color={model === m ? t.brand : t.textMuted}
-              onPress={() => setModel(m)}
-            >
+            <Text key={m} color={model === m ? t.brand : t.textMuted} onPress={() => setModel(m)}>
               {model === m ? `● ${m}` : `○ ${m}`}
             </Text>
           ))}

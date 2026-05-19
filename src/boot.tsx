@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
-import { loadConfig, configExists, setTheme } from "./core/config/index.js";
+import { configExists, loadConfig } from "./core/config/index.js";
+import { setTheme } from "./core/theme/index.js";
 import { useSessionStore } from "./stores/session.js";
 
 const cliArgs = process.argv.slice(2);
@@ -14,11 +15,13 @@ if (cliArgs.includes("--headless")) {
 
 // Simple CLI flags
 if (cliArgs.includes("--version") || cliArgs.includes("-v")) {
+  // biome-ignore lint/suspicious/noConsole: CLI output
   console.log("soulforge-light 1.0.0");
   process.exit(0);
 }
 
 if (cliArgs.includes("--help") || cliArgs.includes("-h")) {
+  // biome-ignore lint/suspicious/noConsole: CLI output
   console.log(`soulforge-light — Lightweight terminal AI coding assistant
 
 Usage:

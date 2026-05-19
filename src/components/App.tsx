@@ -1,10 +1,10 @@
-import { HeaderBar } from "./HeaderBar.js";
+import { getTheme } from "../core/theme/index.js";
+import { useAppStore } from "../stores/app.js";
 import { ChatPanel } from "./ChatPanel.js";
 import { FooterBar } from "./FooterBar.js";
+import { HeaderBar } from "./HeaderBar.js";
 import { SettingsOverlay } from "./SettingsOverlay.js";
 import { Box } from "./ui/box.js";
-import { useAppStore } from "../stores/app.js";
-import { getTheme } from "../core/theme/index.js";
 
 export function App() {
   const t = getTheme();

@@ -1,9 +1,10 @@
-import { loadConfig } from "../core/config/index.js";
 import { runAgentStream } from "../core/agent.js";
+import { loadConfig } from "../core/config/index.js";
 
 export async function runHeadless(args: string[]) {
   const config = loadConfig();
   if (!config) {
+    // biome-ignore lint/suspicious/noConsole: CLI error output
     console.error("No config found. Run `soulforge` to set up.");
     process.exit(1);
   }
@@ -12,12 +13,15 @@ export async function runHeadless(args: string[]) {
   const prompt = args[promptIndex] ?? "";
 
   if (!prompt && !args.includes("--chat")) {
+    // biome-ignore lint/suspicious/noConsole: CLI error output
     console.error("Usage: soulforge --headless 'prompt'");
     process.exit(1);
   }
 
   if (args.includes("--chat")) {
+    // biome-ignore lint/suspicious/noConsole: CLI output
     console.log("SoulForge Light — Headless Chat Mode");
+    // biome-ignore lint/suspicious/noConsole: CLI output
     console.log("Type 'quit' to exit.\n");
 
     const messages: { role: "user" | "assistant"; content: string }[] = [];
@@ -33,7 +37,11 @@ export async function runHeadless(args: string[]) {
         config.provider,
         config.model,
         config.apiKey,
-        messages.map((m) => ({ ...m, id: crypto.randomUUID(), timestamp: new Date().toISOString() })),
+        messages.map((m) => ({
+          ...m,
+          id: crypto.randomUUID(),
+          timestamp: new Date().toISOString(),
+        })),
         {
           onTextChunk: (chunk) => {
             process.stdout.write(chunk);
@@ -42,6 +50,7 @@ export async function runHeadless(args: string[]) {
           onToolCall: () => {},
           onToolResult: () => {},
           onFinish: () => {
+            // biome-ignore lint/suspicious/noConsole: CLI output
             console.log("\n");
             messages.push({ role: "assistant", content: fullText });
           },
@@ -58,17 +67,14 @@ export async function runHeadless(args: string[]) {
       },
     ];
 
-    await runAgentStream(
-      config.provider,
-      config.model,
-      config.apiKey,
-      messages,
-      {
-        onTextChunk: (chunk) => process.stdout.write(chunk),
-        onToolCall: () => {},
-        onToolResult: () => {},
-        onFinish: () => console.log(""),
+    await runAgentStream(config.provider, config.model, config.apiKey, messages, {
+      onTextChunk: (chunk) => process.stdout.write(chunk),
+      onToolCall: () => {},
+      onToolResult: () => {},
+      onFinish: () => {
+        // biome-ignore lint/suspicious/noConsole: CLI output
+        console.log("");
       },
-    );
+    });
   }
 }

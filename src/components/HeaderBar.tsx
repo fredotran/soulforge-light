@@ -1,9 +1,9 @@
+import { loadConfig } from "../core/config/index.js";
+import { getTheme } from "../core/theme/index.js";
+import { useAppStore } from "../stores/app.js";
+import { useSessionStore } from "../stores/session.js";
 import { Box } from "./ui/box.js";
 import { Text } from "./ui/text.js";
-import { useSessionStore } from "../stores/session.js";
-import { useAppStore } from "../stores/app.js";
-import { getTheme } from "../core/theme/index.js";
-import { loadConfig } from "../core/config/index.js";
 
 export function HeaderBar() {
   const t = getTheme();

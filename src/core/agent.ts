@@ -1,12 +1,12 @@
 import { createAnthropic } from "@ai-sdk/anthropic";
-import { createOpenAI } from "@ai-sdk/openai";
+import { createDeepSeek } from "@ai-sdk/deepseek";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createGroq } from "@ai-sdk/groq";
 import { createMistral } from "@ai-sdk/mistral";
-import { createDeepSeek } from "@ai-sdk/deepseek";
-import { streamText, type CoreTool } from "ai";
-import { tools } from "./tools/index.js";
+import { createOpenAI } from "@ai-sdk/openai";
+import { streamText } from "ai";
 import type { Message } from "../types/index.js";
+import { tools } from "./tools/index.js";
 
 const providerMap: Record<string, (config: { apiKey: string }) => unknown> = {
   anthropic: createAnthropic,
@@ -38,13 +38,13 @@ export async function runAgentStream(
   // biome-ignore lint/suspicious/noExplicitAny: provider factory returns any
   const model = (provider as any)(modelName);
 
-  const aiTools: Record<string, CoreTool> = {};
+  const aiTools: Record<string, unknown> = {};
   for (const tool of tools) {
     aiTools[tool.name] = {
       description: tool.description,
       parameters: tool.parameters,
       execute: tool.execute,
-    } as CoreTool;
+    };
   }
 
   const result = streamText({
@@ -55,7 +55,8 @@ export async function runAgentStream(
       role: m.role === "tool" ? "assistant" : m.role,
       content: m.content,
     })),
-    tools: aiTools,
+    // biome-ignore lint/suspicious/noExplicitAny: tool typing is complex
+    tools: aiTools as any,
   });
 
   let fullText = "";
@@ -64,11 +65,15 @@ export async function runAgentStream(
     callbacks.onTextChunk(chunk);
   }
 
-  const response = await result.response;
-  for (const tc of response.toolCalls ?? []) {
+  // biome-ignore lint/suspicious/noExplicitAny: accessing tool results from streamText
+  const toolCalls = (await (result as any).toolCalls) ?? [];
+  // biome-ignore lint/suspicious/noExplicitAny: accessing tool results from streamText
+  const toolResults = (await (result as any).toolResults) ?? [];
+
+  for (const tc of toolCalls) {
     callbacks.onToolCall(tc.toolName, tc.args);
   }
-  for (const tr of response.toolResults ?? []) {
+  for (const tr of toolResults) {
     callbacks.onToolResult(tr.toolName, tr.result);
   }
 

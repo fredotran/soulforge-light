@@ -11,18 +11,12 @@ export const grepTool = {
   parameters: argsSchema,
   execute: async (args: z.infer<typeof argsSchema>) => {
     try {
-      const proc = Bun.spawn(
-        ["rg", "--json", "-C", "2", args.pattern, args.path ?? "."],
-        {
-          stdout: "pipe",
-          stderr: "pipe",
-        },
-      );
+      const proc = Bun.spawn(["rg", "--json", "-C", "2", args.pattern, args.path ?? "."], {
+        stdout: "pipe",
+        stderr: "pipe",
+      });
       const output = await new Response(proc.stdout).text();
-      const lines = output
-        .trim()
-        .split("\n")
-        .filter(Boolean);
+      const lines = output.trim().split("\n").filter(Boolean);
       const matches = lines
         .map((l) => {
           try {

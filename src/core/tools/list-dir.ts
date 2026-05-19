@@ -1,6 +1,6 @@
 import { readdirSync, statSync } from "node:fs";
-import { z } from "zod";
 import { join } from "node:path";
+import { z } from "zod";
 
 const argsSchema = z.object({
   path: z.string().describe("Directory path to list"),

@@ -1,8 +1,8 @@
-import { create } from "zustand";
-import { readFileSync, writeFileSync, readdirSync } from "node:fs";
+import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Tab, Message } from "../types/index.js";
+import { create } from "zustand";
 import { getSessionsDir } from "../core/config/index.js";
+import type { Message, Tab } from "../types/index.js";
 
 interface SessionState {
   tabs: Tab[];
@@ -44,7 +44,7 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
   closeTab: (id) => {
     set((s) => {
       const tabs = s.tabs.filter((t) => t.id !== id);
-      const activeTabId = s.activeTabId === id ? tabs[0]?.id ?? null : s.activeTabId;
+      const activeTabId = s.activeTabId === id ? (tabs[0]?.id ?? null) : s.activeTabId;
       return { tabs, activeTabId };
     });
   },
@@ -67,7 +67,8 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
           const lines = raw.trim().split("\n").filter(Boolean);
           const messages = lines.map((l) => JSON.parse(l) as Message);
           const tabId = file.replace(".jsonl", "");
-          const firstUser = messages.find((m) => m.role === "user")?.content ?? "Chat";
+          const firstUserMsg = messages.find((m) => m.role === "user");
+          const firstUser = firstUserMsg?.content ?? "Chat";
           const name = firstUser.split(" ").slice(0, 3).join(" ") || "Chat";
           tabs.push({
             id: tabId,
@@ -80,8 +81,9 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
           // skip corrupted session files
         }
       }
-      if (tabs.length > 0) {
-        set({ tabs, activeTabId: tabs[0].id });
+      const firstTab = tabs[0];
+      if (firstTab) {
+        set({ tabs, activeTabId: firstTab.id });
       } else {
         const tab = makeTab();
         set({ tabs: [tab], activeTabId: tab.id });
@@ -98,7 +100,7 @@ export const useSessionStore = create<SessionState>()((set, get) => ({
     const dir = getSessionsDir();
     const path = join(dir, `${tabId}.jsonl`);
     const lines = tab.messages.map((m) => JSON.stringify(m)).join("\n");
-    writeFileSync(path, lines + "\n");
+    writeFileSync(path, `${lines}\n`);
   },
 
   saveAllTabs: () => {

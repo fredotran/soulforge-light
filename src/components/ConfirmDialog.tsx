@@ -1,6 +1,6 @@
+import { getTheme } from "../core/theme/index.js";
 import { Box } from "./ui/box.js";
 import { Text } from "./ui/text.js";
-import { getTheme } from "../core/theme/index.js";
 
 interface ConfirmDialogProps {
   message: string;

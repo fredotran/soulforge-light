@@ -1,8 +1,8 @@
+import { getTheme } from "../core/theme/index.js";
+import { useChatStore } from "../stores/chat.js";
+import { useSessionStore } from "../stores/session.js";
 import { Box } from "./ui/box.js";
 import { Text } from "./ui/text.js";
-import { getTheme } from "../core/theme/index.js";
-import { useSessionStore } from "../stores/session.js";
-import { useChatStore } from "../stores/chat.js";
 
 export function FooterBar() {
   const t = getTheme();

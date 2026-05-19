@@ -1,8 +1,8 @@
 import { useState } from "react";
+import { saveConfig } from "../core/config/index.js";
+import { getTheme } from "../core/theme/index.js";
 import { Box } from "./ui/box.js";
 import { Text } from "./ui/text.js";
-import { getTheme } from "../core/theme/index.js";
-import { saveConfig } from "../core/config/index.js";
 
 const PROVIDERS = ["anthropic", "openai", "google", "groq", "mistral", "deepseek"];
 const MODELS: Record<string, string[]> = {
@@ -19,7 +19,7 @@ export function Wizard({ onComplete }: { onComplete: () => void }) {
   const [step, setStep] = useState(0);
   const [provider, setProvider] = useState("anthropic");
   const [model, setModel] = useState("claude-sonnet-4");
-  const [apiKey, setApiKey] = useState("");
+  const [apiKey, _setApiKey] = useState("");
 
   const handleFinish = () => {
     saveConfig({ provider, model, apiKey, theme: "dark" });
@@ -53,7 +53,7 @@ export function Wizard({ onComplete }: { onComplete: () => void }) {
               color={provider === p ? t.brand : t.textMuted}
               onPress={() => {
                 setProvider(p);
-                setModel(MODELS[p][0]);
+                setModel(MODELS[p]?.[0] ?? "");
               }}
             >
               {provider === p ? `● ${p}` : `○ ${p}`}

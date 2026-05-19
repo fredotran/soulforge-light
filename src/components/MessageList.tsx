@@ -1,9 +1,9 @@
-import { Box } from "./ui/box.js";
-import { UserMessage } from "./UserMessage.js";
-import { AssistantMessage } from "./AssistantMessage.js";
-import { ToolCallBlock } from "./ToolCallBlock.js";
 import { useChatStore } from "../stores/chat.js";
 import { useSessionStore } from "../stores/session.js";
+import { AssistantMessage } from "./AssistantMessage.js";
+import { ToolCallBlock } from "./ToolCallBlock.js";
+import { UserMessage } from "./UserMessage.js";
+import { Box } from "./ui/box.js";
 
 export function MessageList() {
   const { activeTabId } = useSessionStore();

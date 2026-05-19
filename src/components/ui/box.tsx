@@ -14,6 +14,7 @@ interface BoxProps {
   paddingRight?: number;
   borderStyle?: "single" | "double" | "round" | "bold";
   borderColor?: string;
+  onPress?: () => void;
 }
 
 export function Box({ children, ...props }: BoxProps) {
