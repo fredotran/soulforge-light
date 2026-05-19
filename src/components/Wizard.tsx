@@ -36,9 +36,9 @@ export function Wizard({ onComplete }: { onComplete: () => void }) {
           <Box height={1} />
           <Text color={t.textSecondary}>A lightweight terminal AI coding assistant.</Text>
           <Box height={1} />
-          <Text color={t.success} onPress={() => setStep(1)}>
-            [Start Setup]
-          </Text>
+          <Box onPress={() => setStep(1)}>
+            <Text color={t.success}>[Start Setup]</Text>
+          </Box>
         </>
       )}
       {step === 1 && (
@@ -48,16 +48,17 @@ export function Wizard({ onComplete }: { onComplete: () => void }) {
           </Text>
           <Box height={1} />
           {PROVIDERS.map((p) => (
-            <Text
+            <Box
               key={p}
-              color={provider === p ? t.brand : t.textMuted}
               onPress={() => {
                 setProvider(p);
                 setModel(MODELS[p]?.[0] ?? "");
               }}
             >
-              {provider === p ? `● ${p}` : `○ ${p}`}
-            </Text>
+              <Text color={provider === p ? t.brand : t.textMuted}>
+                {provider === p ? `● ${p}` : `○ ${p}`}
+              </Text>
+            </Box>
           ))}
           <Box height={1} />
           <Text color={t.textSecondary}>Model: {model}</Text>
@@ -65,9 +66,9 @@ export function Wizard({ onComplete }: { onComplete: () => void }) {
           <Text color={t.textSecondary}>API Key:</Text>
           <Text color={t.textMuted}>************</Text>
           <Box height={1} />
-          <Text color={t.success} onPress={() => setStep(2)}>
-            [Continue]
-          </Text>
+          <Box onPress={() => setStep(2)}>
+            <Text color={t.success}>[Continue]</Text>
+          </Box>
         </>
       )}
       {step === 2 && (
@@ -78,9 +79,9 @@ export function Wizard({ onComplete }: { onComplete: () => void }) {
           <Box height={1} />
           <Text color={t.textSecondary}>Start chatting with soulforge.</Text>
           <Box height={1} />
-          <Text color={t.success} onPress={handleFinish}>
-            [Launch]
-          </Text>
+          <Box onPress={handleFinish}>
+            <Text color={t.success}>[Launch]</Text>
+          </Box>
         </>
       )}
     </Box>

@@ -14,20 +14,17 @@ export function HeaderBar() {
   return (
     <Box flexDirection="row" height={1} paddingLeft={1} paddingRight={1}>
       {tabs.map((tab) => (
-        <Box key={tab.id} paddingRight={2}>
+        <Box key={tab.id} onPress={() => setActiveTab(tab.id)}>
           <Text
             color={tab.id === activeTabId ? t.brand : t.textMuted}
             bold={tab.id === activeTabId}
-            onPress={() => setActiveTab(tab.id)}
           >
             {tab.id === activeTabId ? `[${tab.name}]` : ` ${tab.name} `}
           </Text>
         </Box>
       ))}
-      <Box paddingRight={2}>
-        <Text color={t.textMuted} onPress={() => createTab()}>
-          +
-        </Text>
+      <Box paddingRight={2} onPress={() => createTab()}>
+        <Text color={t.textMuted}>+</Text>
       </Box>
       <Box flexGrow={1} />
       <Box paddingRight={2}>
@@ -35,10 +32,8 @@ export function HeaderBar() {
           {config?.model ?? "no model"}
         </Text>
       </Box>
-      <Box>
-        <Text color={t.textMuted} onPress={openSettings}>
-          ≡
-        </Text>
+      <Box onPress={openSettings}>
+        <Text color={t.textMuted}>≡</Text>
       </Box>
     </Box>
   );

@@ -32,61 +32,65 @@ export function SettingsPanel() {
     <Box flexDirection="column" flexGrow={1}>
       <Box flexDirection="row" height={1} gap={2}>
         {(["providers", "theme", "keys"] as const).map((tab) => (
-          <Text
-            key={tab}
-            color={activeTab === tab ? t.brand : t.textMuted}
-            bold={activeTab === tab}
-            onPress={() => setActiveTab(tab)}
-          >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
-          </Text>
+          <Box key={tab} onPress={() => setActiveTab(tab)}>
+            <Text color={activeTab === tab ? t.brand : t.textMuted} bold={activeTab === tab}>
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </Text>
+          </Box>
         ))}
         <Box flexGrow={1} />
-        <Text color={t.error} onPress={closeSettings}>
-          [X]
-        </Text>
+        <Box onPress={closeSettings}>
+          <Text color={t.error}>[X]</Text>
+        </Box>
       </Box>
       <Box height={1} />
       {activeTab === "providers" && (
         <Box flexDirection="column" gap={1}>
           <Text color={t.textSecondary}>Provider:</Text>
           {PROVIDERS.map((p) => (
-            <Text
+            <Box
               key={p}
-              color={provider === p ? t.brand : t.textMuted}
               onPress={() => {
                 setProvider(p);
                 setModel(MODELS[p]?.[0] ?? "");
               }}
             >
-              {provider === p ? `● ${p}` : `○ ${p}`}
-            </Text>
+              <Text color={provider === p ? t.brand : t.textMuted}>
+                {provider === p ? `● ${p}` : `○ ${p}`}
+              </Text>
+            </Box>
           ))}
           <Box height={1} />
           <Text color={t.textSecondary}>Model:</Text>
           {(MODELS[provider] ?? []).map((m) => (
-            <Text key={m} color={model === m ? t.brand : t.textMuted} onPress={() => setModel(m)}>
-              {model === m ? `● ${m}` : `○ ${m}`}
-            </Text>
+            <Box key={m} onPress={() => setModel(m)}>
+              <Text color={model === m ? t.brand : t.textMuted}>
+                {model === m ? `● ${m}` : `○ ${m}`}
+              </Text>
+            </Box>
           ))}
           <Box height={1} />
           <Text color={t.textSecondary}>API Key:</Text>
           <Text color={t.textMuted}>************</Text>
           <Box height={1} />
-          <Text color={t.success} onPress={handleSave}>
-            [Save]
-          </Text>
+          <Box onPress={handleSave}>
+            <Text color={t.success}>[Save]</Text>
+          </Box>
         </Box>
       )}
       {activeTab === "theme" && (
         <Box flexDirection="column" gap={1}>
           <Text color={t.textSecondary}>Theme:</Text>
-          <Text color={theme === "dark" ? t.brand : t.textMuted} onPress={toggleTheme}>
-            {theme === "dark" ? "● Dark" : "○ Dark"}
-          </Text>
-          <Text color={theme === "light" ? t.brand : t.textMuted} onPress={toggleTheme}>
-            {theme === "light" ? "● Light" : "○ Light"}
-          </Text>
+          <Box onPress={toggleTheme}>
+            <Text color={theme === "dark" ? t.brand : t.textMuted}>
+              {theme === "dark" ? "● Dark" : "○ Dark"}
+            </Text>
+          </Box>
+          <Box onPress={toggleTheme}>
+            <Text color={theme === "light" ? t.brand : t.textMuted}>
+              {theme === "light" ? "● Light" : "○ Light"}
+            </Text>
+          </Box>
         </Box>
       )}
       {activeTab === "keys" && (
