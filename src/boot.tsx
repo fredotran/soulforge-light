@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { configExists, loadConfig } from "./core/config/index.js";
+import { loadConfig } from "./core/config/index.js";
 import { setTheme } from "./core/theme/index.js";
 import { useSessionStore } from "./stores/session.js";
 
@@ -42,14 +42,8 @@ if (config) {
   setTheme("dark");
 }
 
-// Wizard or main app
-if (!configExists()) {
-  // Show wizard — we'll need to handle this in the TUI
-  // For now, create a default tab and let the user configure later
-  useSessionStore.getState().loadSessions();
-} else {
-  useSessionStore.getState().loadSessions();
-}
+// Load sessions (or create default tab)
+useSessionStore.getState().loadSessions();
 
 // Import and render App
 const { createCliRenderer } = await import("@opentui/core");

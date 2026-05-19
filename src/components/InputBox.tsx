@@ -1,22 +1,26 @@
-import { getTheme } from "../core/theme/index.js";
 import { useAppStore } from "../stores/app.js";
-import { Box } from "./ui/box.js";
-import { Text } from "./ui/text.js";
 
 interface InputBoxProps {
   onSubmit: (text: string) => void;
 }
 
-export function InputBox({ onSubmit: _onSubmit }: InputBoxProps) {
-  const t = getTheme();
+export function InputBox({ onSubmit }: InputBoxProps) {
   const inputText = useAppStore((s) => s.inputText);
+  const setInputText = useAppStore((s) => s.setInputText);
 
   return (
-    <Box flexDirection="row" height={1} paddingLeft={1} paddingRight={1}>
-      <Text color={t.brand}>&gt;</Text>
-      <Box width={1} />
-      <Text color={t.textPrimary}>{inputText}</Text>
-      <Text color={t.brand}>_</Text>
-    </Box>
+    <input
+      focused
+      placeholder="Type a message or /command..."
+      value={inputText}
+      onInput={(value) => setInputText(value)}
+      onSubmit={(value) => {
+        const text = String(value).trim();
+        if (text) {
+          onSubmit(text);
+          setInputText("");
+        }
+      }}
+    />
   );
 }
