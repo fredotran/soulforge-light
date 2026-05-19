@@ -1,399 +1,45 @@
-import { type createCliRenderer as CreateCliRenderer, TextAttributes } from "@opentui/core";
+import type { createCliRenderer as CreateCliRenderer } from "@opentui/core";
 import type { createRoot as CreateRoot } from "@opentui/react";
-import { startTransition, useCallback, useEffect, useState } from "react";
 import type { App as AppComponent } from "./components/App.js";
-import type { ContextManager } from "./core/context/manager.js";
-import { killAllNvimProcesses } from "./core/editor/neovim.js";
-import { icon } from "./core/icons.js";
-import { killAllLspSync } from "./core/intelligence/backends/lsp/pid-tracker.js";
-import { disposeIntelligenceRouter } from "./core/intelligence/index.js";
-import { deactivateCurrentProvider, type ProviderStatus } from "./core/llm/provider.js";
-import { disposeMCPManager } from "./core/mcp/index.js";
-import { killAllTracked, killProcessGroup } from "./core/process-tracker.js";
-import { getRestartSpec } from "./core/restart.js";
-import { flushEmergencySession } from "./core/sessions/emergency-save.js";
-import type { PrerequisiteStatus } from "./core/setup/prerequisites.js";
-import { closeAllTerminals } from "./core/terminal/manager.js";
-import { getThemeTokens, useTheme } from "./core/theme/index.js";
-import { garble } from "./core/utils/splash.js";
-import { resetStatusBarStore } from "./stores/statusbar.js";
-import { resetUIStore } from "./stores/ui.js";
-import type { AppConfig } from "./types/index.js";
 
-let exitSessionId: string | null = null;
 let renderer: Awaited<ReturnType<typeof CreateCliRenderer>> | null = null;
 
-export function setExitSessionId(id: string | null): void {
-  exitSessionId = id;
-}
-
-function restoreTerminal(): void {
-  try {
-    if (process.stdin.isTTY && process.stdin.isRaw) {
-      process.stdin.setRawMode(false);
-    }
-  } catch {}
-  try {
-    process.stdout.write("\x1b[?25h\x1b[0m");
-  } catch {}
-}
-
-let cleanedUp = false;
-
-function runCleanup(): void {
-  if (cleanedUp) return;
-  cleanedUp = true;
-  restoreTerminal();
-  try {
-    deactivateCurrentProvider();
-  } catch {}
-  try {
-    disposeIntelligenceRouter();
-  } catch {}
-  try {
-    closeAllTerminals();
-  } catch {}
-  try {
-    killAllTracked();
-  } catch {}
-  try {
-    killAllNvimProcesses();
-  } catch {}
-  try {
-    disposeMCPManager();
-  } catch {}
-  // Kill all LSP processes tracked by PID file — survives crashes/SIGKILL
-  try {
-    killAllLspSync();
-  } catch {}
-  // Nuclear fallback: kill entire process group to catch any orphaned grandchildren
-  try {
-    killProcessGroup();
-  } catch {}
-}
-
-let bannerPrinted = false;
-
-function hexToAnsi(hex: string): string {
-  let h = hex.slice(1);
-  if (h.length <= 4) h = [...h].map((c) => c + c).join("");
-  const n = Number.parseInt(h, 16);
-  return `\x1b[38;2;${(n >> 16) & 0xff};${(n >> 8) & 0xff};${n & 0xff}m`;
-}
-
-function printExitBanner(): void {
-  if (bannerPrinted) return;
-  bannerPrinted = true;
-  process.stdout.write("\x1b[2J\x1b[H");
-  if (exitSessionId) {
-    const t = getThemeTokens();
-    const brand = `\x1b[1m${hexToAnsi(t.brand)}`;
-    const accent = `\x1b[1m${hexToAnsi(t.info)}`;
-    const secondary = hexToAnsi(t.brandSecondary);
-    const rst = "\x1b[0m";
-    const shortId = exitSessionId.slice(0, 8);
-    process.stdout.write(
-      `${brand}${icon("ghost")} SoulForge${rst} session saved.\n` +
-        `  Resume: ${accent}soulforge --session ${shortId}${rst}\n` +
-        `  by ${brand}Proxy${secondary}Soul${rst}.com\n\n`,
-    );
-  }
-}
-
 export function cleanupAndExit(code = 0): void {
-  runCleanup();
-  renderer?.destroy();
-  printExitBanner();
+  try {
+    renderer?.destroy();
+  } catch {}
   process.exit(code);
 }
 
-let triggerRestart: (() => void) | null = null;
-
-export function restart(): void {
-  triggerRestart?.();
-}
-
-/**
- * Replace the current process with a fresh instance of the binary.
- * Used after an in-app upgrade so the new version's code is actually loaded.
- * Works on macOS and Linux — spawns the new binary with inherited stdio,
- * then exits the current process so the terminal seamlessly transfers.
- */
-export function hardRestart(): void {
-  runCleanup();
-  renderer?.destroy();
-  // Clear screen and restore cursor before handing off
-  process.stdout.write("\x1b[?25h\x1b[2J\x1b[H");
-  const restart = getRestartSpec();
-  // Spawn the (now-updated) binary with full terminal inheritance
-  const child = Bun.spawn([restart.command, ...restart.args], {
-    stdio: ["inherit", "inherit", "inherit"],
-    env: process.env,
-  });
-  // Detach: let the child own the terminal, then exit this process.
-  // unref() ensures our event loop doesn't wait for the child.
-  child.unref();
-  process.exit(0);
-}
-
-process.on("exit", () => {
-  runCleanup();
-  printExitBanner();
-});
-
-/**
- * Re-raise a caught signal so the parent shell sees a true signal death
- * (WIFSIGNALED=true) instead of a normal exit with code 128+N.
- * This prevents shells like fish from printing spurious
- * "terminated by signal" messages.
- * See: https://unix.stackexchange.com/questions/386836
- */
-function reraiseSignal(signal: NodeJS.Signals): void {
-  flushEmergencySession();
-  runCleanup();
-  renderer?.destroy();
-  printExitBanner();
-  process.removeAllListeners(signal);
-  process.kill(process.pid, signal);
-}
-
-process.on("SIGINT", () => reraiseSignal("SIGINT"));
-process.on("SIGTERM", () => reraiseSignal("SIGTERM"));
-process.on("SIGHUP", () => reraiseSignal("SIGHUP"));
+process.on("SIGINT", () => cleanupAndExit(0));
+process.on("SIGTERM", () => cleanupAndExit(0));
 
 process.on("uncaughtException", (err) => {
-  flushEmergencySession();
-  restoreTerminal();
-  process.stderr.write(`\nUncaught exception: ${err?.stack ?? err?.message ?? String(err)}\n`);
-  process.exit(1);
+  process.stderr.write(`\nError: ${err?.message ?? String(err)}\n`);
+  cleanupAndExit(1);
 });
-
-process.on("unhandledRejection", (reason) => {
-  flushEmergencySession();
-  process.stderr.write(`\nUnhandled rejection: ${String(reason)}\n`);
-});
-
-const RESTART_STEPS = [
-  "Quenching active flames…",
-  "Rereading the scrolls…",
-  "Consulting the LLM gods…",
-  "Reforging the soul…",
-];
-
-const RESTART_SPINNER = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-
-function RestartSplash({ onComplete }: { onComplete: () => void }) {
-  const t = useTheme();
-  const ghost = icon("ghost");
-  const label = "Restarting";
-
-  const [anim, setAnim] = useState({
-    phase: 0,
-    ghostFrame: ghost,
-    typeIdx: 0,
-    wordmark: garble("SOULFORGE"),
-    spinIdx: 0,
-  });
-
-  useEffect(() => {
-    let step = 0;
-    const timer = setInterval(() => {
-      step++;
-      setAnim((prev) => {
-        const next = { ...prev, spinIdx: prev.spinIdx + 1 };
-        // Ghost fade out: frames 1-4
-        if (step === 1) next.ghostFrame = "▓";
-        if (step === 2) next.ghostFrame = "▒";
-        if (step === 3) next.ghostFrame = "░";
-        if (step === 4) next.ghostFrame = " ";
-        // Ghost fade in: frames 6-9
-        if (step === 6) next.ghostFrame = "░";
-        if (step === 7) next.ghostFrame = "▒";
-        if (step === 8) next.ghostFrame = "▓";
-        if (step === 9) next.ghostFrame = ghost;
-        // Typewriter: frames 10+
-        if (step >= 10 && step <= 10 + label.length) {
-          next.typeIdx = step - 10;
-        }
-        // Status steps
-        if (step === 10 + label.length + 2) next.phase = 1;
-        if (step === 10 + label.length + 5) next.phase = 2;
-        if (step === 10 + label.length + 8) next.phase = 3;
-        // Wordmark glitch
-        if (step === 10 + label.length + 11) next.wordmark = garble("SOULFORGE");
-        if (step === 10 + label.length + 12) next.wordmark = "SOULFORGE";
-        if (step === 10 + label.length + 13) next.wordmark = garble("SOULFORGE");
-        return next;
-      });
-      // Done
-      if (step === 10 + label.length + 16) {
-        clearInterval(timer);
-        onComplete();
-      }
-    }, 50);
-    return () => clearInterval(timer);
-  }, [onComplete, ghost]);
-
-  const visibleLabel = label.slice(0, anim.typeIdx);
-  const cursor = anim.typeIdx < label.length ? "█" : "";
-  const spin = RESTART_SPINNER[anim.spinIdx % RESTART_SPINNER.length];
-
-  return (
-    <box flexDirection="column" flexGrow={1} justifyContent="center" alignItems="center">
-      <text fg={t.brand} attributes={TextAttributes.BOLD}>
-        {anim.ghostFrame}
-      </text>
-      <box height={1} />
-      <text>
-        <span fg={t.textSecondary}>{visibleLabel}</span>
-        <span fg={t.brandSecondary}>{cursor}</span>
-      </text>
-      <box height={1} />
-      <text fg={t.textDim}>{"─".repeat(30)}</text>
-      <box height={1} />
-      {RESTART_STEPS.map((step, i) => {
-        if (i > anim.phase) return null;
-        const done = i < anim.phase;
-        return (
-          <box key={step} gap={1} flexDirection="row">
-            <text fg={done ? t.success : t.brand}>{done ? "✓" : spin}</text>
-            <text fg={done ? t.textSecondary : t.textPrimary}>{step}</text>
-          </box>
-        );
-      })}
-      <box height={1} />
-      <text fg={t.brand} attributes={TextAttributes.BOLD}>
-        {anim.wordmark}
-      </text>
-    </box>
-  );
-}
 
 interface StartOptions {
   App: typeof AppComponent;
   createCliRenderer: typeof CreateCliRenderer;
   createRoot: typeof CreateRoot;
-  config: AppConfig;
-  projectConfig: Partial<AppConfig> | null;
-  resumeSessionId?: string;
-  forceWizard?: boolean;
-  bootProviders: ProviderStatus[];
-  bootPrereqs: PrerequisiteStatus[];
-  contextManager?: ContextManager;
-}
-
-function AppRoot({ opts }: { opts: StartOptions }) {
-  const [appKey, setAppKey] = useState(0);
-  const [restarting, setRestarting] = useState(false);
-  const [freshConfig, setFreshConfig] = useState(opts.config);
-  const [freshProjectConfig, setFreshProjectConfig] = useState(opts.projectConfig);
-  const [freshProviders, setFreshProviders] = useState(opts.bootProviders);
-  const [freshPrereqs, setFreshPrereqs] = useState(opts.bootPrereqs);
-  const [contextManager, setContextManager] = useState(opts.contextManager);
-
-  useEffect(() => {
-    triggerRestart = () => setRestarting(true);
-    return () => {
-      triggerRestart = null;
-    };
-  }, []);
-
-  const handleRestartComplete = useCallback(async () => {
-    resetStatusBarStore();
-    resetUIStore();
-
-    try {
-      const { loadConfig, loadProjectConfig } = await import("./config/index.js");
-      const { checkProviders } = await import("./core/llm/provider.js");
-      const { checkPrerequisites } = await import("./core/setup/prerequisites.js");
-
-      const newConfig = loadConfig();
-      const newProjectConfig = loadProjectConfig(process.cwd());
-      const [newProviders, newPrereqs] = await Promise.all([
-        checkProviders(),
-        Promise.resolve(checkPrerequisites()),
-      ]);
-
-      const kp = newProjectConfig?.keyPriority ?? newConfig.keyPriority;
-      if (kp) {
-        const { setDefaultKeyPriority } = await import("./core/secrets.js");
-        setDefaultKeyPriority(kp);
-      }
-
-      setFreshConfig(newConfig);
-      setFreshProjectConfig(newProjectConfig);
-      setFreshProviders(newProviders);
-      setFreshPrereqs(newPrereqs);
-    } catch (err) {
-      // biome-ignore lint/suspicious/noConsole: intentional error surfacing on restart failure
-      console.error("Restart config reload failed:", err);
-    }
-    // Batch all state updates to avoid 7 separate re-renders after await
-    startTransition(() => {
-      setContextManager(undefined);
-      setExitSessionId(null);
-      setAppKey((k) => k + 1);
-      setRestarting(false);
-    });
-  }, []);
-
-  if (restarting) {
-    return <RestartSplash onComplete={handleRestartComplete} />;
-  }
-
-  return (
-    <opts.App
-      key={appKey}
-      config={freshConfig}
-      projectConfig={freshProjectConfig}
-      resumeSessionId={appKey === 0 ? opts.resumeSessionId : undefined}
-      forceWizard={appKey === 0 && opts.forceWizard}
-      bootProviders={freshProviders}
-      bootPrereqs={freshPrereqs}
-      preloadedContextManager={contextManager}
-    />
-  );
 }
 
 export async function start(opts: StartOptions): Promise<void> {
   const r = await opts.createCliRenderer({
     exitOnCtrlC: false,
     useKittyKeyboard: { disambiguate: true },
-    openConsoleOnError: false,
-    // Pipes child-process output (nvim, shell tools, lazygit) directly to the
-    // host terminal instead of buffering in the renderer.
     externalOutputMode: "passthrough",
-    // Cap render rate to a steady 60fps so streaming chat + animations don't
-    // burn CPU on fast terminals (default is uncapped).
     targetFps: 60,
   });
   renderer = r;
-  // Set initial terminal title; per-tab/session updates wire in App.tsx.
-  try {
-    r.setTerminalTitle("SoulForge");
-  } catch {}
 
-  // 20+ components use useKeyboard/useOnResize concurrently — raise the
-  // default EventEmitter limit (10) to suppress spurious leak warnings.
   r.setMaxListeners(30);
   r.keyInput.setMaxListeners(30);
 
-  // Register custom renderables for JSX usage
-  {
-    const { extend } = await import("@opentui/react");
-    const { TextTableRenderable } = await import("@opentui/core");
-    extend({ "text-table": TextTableRenderable });
+  try {
+    r.setTerminalTitle("SoulForge Light");
+  } catch {}
 
-    // Native .node addon can't be embedded in compiled binaries — graceful fallback
-    try {
-      const { GhosttyTerminalRenderable } = await import("ghostty-opentui/terminal-buffer");
-      // biome-ignore lint/suspicious/noExplicitAny: ghostty-opentui may resolve a different @opentui/core version
-      extend({ "ghostty-terminal": GhosttyTerminalRenderable as any });
-    } catch {}
-  }
-
-  opts.createRoot(r).render(<AppRoot opts={opts} />);
-}
-export function getActiveRenderer(): Awaited<ReturnType<typeof CreateCliRenderer>> | null {
-  return renderer;
+  opts.createRoot(r).render(<opts.App />);
 }
