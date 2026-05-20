@@ -4,8 +4,8 @@ import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createGroq } from "@ai-sdk/groq";
 import { createMistral } from "@ai-sdk/mistral";
 import { createOpenAI } from "@ai-sdk/openai";
-import { streamText } from "ai";
-import type { Message } from "../types/index.js";
+import type { ModelMessage } from "ai";
+import { stepCountIs, streamText } from "ai";
 import { tools } from "./tools/index.js";
 
 const providerMap: Record<string, (config: { apiKey: string }) => unknown> = {
@@ -17,65 +17,80 @@ const providerMap: Record<string, (config: { apiKey: string }) => unknown> = {
   deepseek: createDeepSeek,
 };
 
-interface AgentCallbacks {
-  onTextChunk: (chunk: string) => void;
+export interface AgentCallbacks {
+  onTextDelta: (text: string) => void;
   onToolCall: (name: string, args: Record<string, unknown>) => void;
   onToolResult: (name: string, result: unknown) => void;
-  onFinish: (text: string) => void;
+  onStepFinish: (stepNumber: number) => void;
+  onFinish: () => void;
+  onError: (error: Error) => void;
 }
 
-export async function runAgentStream(
-  providerName: string,
-  modelName: string,
-  apiKey: string,
-  messages: Message[],
-  callbacks: AgentCallbacks,
-) {
-  const create = providerMap[providerName];
-  if (!create) throw new Error(`Unknown provider: ${providerName}`);
+export interface AgentOptions {
+  provider: string;
+  model: string;
+  apiKey: string;
+  systemPrompt: string;
+  messages: ModelMessage[];
+  maxSteps?: number;
+  callbacks: AgentCallbacks;
+}
 
-  const provider = create({ apiKey });
-  // biome-ignore lint/suspicious/noExplicitAny: provider factory returns any
-  const model = (provider as any)(modelName);
-
+function buildToolMap() {
   const aiTools: Record<string, unknown> = {};
-  for (const tool of tools) {
-    aiTools[tool.name] = {
-      description: tool.description,
-      parameters: tool.parameters,
-      execute: tool.execute,
+  for (const t of tools) {
+    aiTools[t.name] = {
+      description: t.description,
+      inputSchema: t.parameters,
+      execute: t.execute,
     };
   }
+  return aiTools;
+}
+
+function createModel(providerName: string, modelName: string, apiKey: string) {
+  const create = providerMap[providerName];
+  if (!create) throw new Error(`Unknown provider: ${providerName}`);
+  const provider = create({ apiKey });
+  // biome-ignore lint/suspicious/noExplicitAny: provider factory typing
+  return (provider as any)(modelName);
+}
+
+export async function runAgent(opts: AgentOptions): Promise<void> {
+  const model = createModel(opts.provider, opts.model, opts.apiKey);
+  const aiTools = buildToolMap();
 
   const result = streamText({
     model,
-    system:
-      "You are SoulForge Light, a helpful coding assistant. You have access to tools for reading and editing files, running shell commands, and using git. Be concise. Always think step by step.",
-    messages: messages.map((m) => ({
-      role: m.role === "tool" ? "assistant" : m.role,
-      content: m.content,
-    })),
-    // biome-ignore lint/suspicious/noExplicitAny: tool typing is complex
+    system: opts.systemPrompt,
+    messages: opts.messages,
+    // biome-ignore lint/suspicious/noExplicitAny: heterogeneous tool map
     tools: aiTools as any,
+    stopWhen: stepCountIs(opts.maxSteps ?? 25),
+    onStepFinish: (event) => {
+      opts.callbacks.onStepFinish(event.stepNumber);
+    },
   });
 
-  let fullText = "";
-  for await (const chunk of result.textStream) {
-    fullText += chunk;
-    callbacks.onTextChunk(chunk);
+  try {
+    for await (const part of result.fullStream) {
+      switch (part.type) {
+        case "text-delta":
+          opts.callbacks.onTextDelta(part.text);
+          break;
+        case "tool-call":
+          opts.callbacks.onToolCall(
+            part.toolName,
+            (part as Record<string, unknown>).input as Record<string, unknown>,
+          );
+          break;
+        case "tool-result":
+          opts.callbacks.onToolResult(part.toolName, (part as Record<string, unknown>).output);
+          break;
+      }
+    }
+    opts.callbacks.onFinish();
+  } catch (err) {
+    opts.callbacks.onError(err instanceof Error ? err : new Error(String(err)));
   }
-
-  // biome-ignore lint/suspicious/noExplicitAny: accessing tool results from streamText
-  const toolCalls = (await (result as any).toolCalls) ?? [];
-  // biome-ignore lint/suspicious/noExplicitAny: accessing tool results from streamText
-  const toolResults = (await (result as any).toolResults) ?? [];
-
-  for (const tc of toolCalls) {
-    callbacks.onToolCall(tc.toolName, tc.args);
-  }
-  for (const tr of toolResults) {
-    callbacks.onToolResult(tr.toolName, tr.result);
-  }
-
-  callbacks.onFinish(fullText);
 }

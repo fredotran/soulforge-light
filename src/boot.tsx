@@ -1,58 +1,67 @@
 #!/usr/bin/env bun
 
-import { loadConfig } from "./core/config/index.js";
-import { setTheme } from "./core/theme/index.js";
-import { useSessionStore } from "./stores/session.js";
+const args = process.argv.slice(2);
 
-const cliArgs = process.argv.slice(2);
-
-// Headless mode
-if (cliArgs.includes("--headless")) {
-  const { runHeadless } = await import("./headless/index.js");
-  await runHeadless(cliArgs);
+if (args.includes("--version") || args.includes("-v")) {
+  process.stdout.write("soulforge-light 1.0.0\n");
   process.exit(0);
 }
 
-// Simple CLI flags
-if (cliArgs.includes("--version") || cliArgs.includes("-v")) {
-  // biome-ignore lint/suspicious/noConsole: CLI output
-  console.log("soulforge-light 1.0.0");
-  process.exit(0);
-}
-
-if (cliArgs.includes("--help") || cliArgs.includes("-h")) {
-  // biome-ignore lint/suspicious/noConsole: CLI output
-  console.log(`soulforge-light — Lightweight terminal AI coding assistant
+if (args.includes("--help") || args.includes("-h")) {
+  process.stdout.write(`soulforge-light — Lightweight CLI AI coding agent
 
 Usage:
-  soulforge                    Start TUI
-  soulforge --headless "msg"   Run a single prompt
-  soulforge --headless --chat  Interactive headless chat
-  soulforge --version          Show version
-  soulforge --help             Show this help
+  soulforge                      Interactive CLI chat (default)
+  soulforge "prompt"             Run a single prompt and exit
+  soulforge --model <model>      Override model (e.g. claude-sonnet-4-20250514)
+  soulforge --system "prompt"    Override system prompt
+  soulforge --tui                Launch full TUI mode
+  soulforge --version            Show version
+  soulforge --help               Show this help
 `);
   process.exit(0);
 }
 
-// Load config and theme
-const config = loadConfig();
-if (config) {
-  setTheme(config.theme);
+if (args.includes("--tui")) {
+  const { loadConfig } = await import("./core/config/index.js");
+  const { setTheme } = await import("./core/theme/index.js");
+  const { useSessionStore } = await import("./stores/session.js");
+
+  const config = loadConfig();
+  setTheme(config?.theme ?? "dark");
+  useSessionStore.getState().loadSessions();
+
+  const { createCliRenderer } = await import("@opentui/core");
+  const { createRoot } = await import("@opentui/react");
+  const { App } = await import("./components/App.js");
+  const { start } = await import("./index.js");
+
+  await start({ App, createCliRenderer, createRoot });
 } else {
-  setTheme("dark");
+  const { runCLI } = await import("./cli/index.js");
+
+  let prompt: string | undefined;
+  let model: string | undefined;
+  let systemOverride: string | undefined;
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i] ?? "";
+    const next = args[i + 1];
+    if (arg === "--model" && next) {
+      model = next;
+      i++;
+    } else if (arg === "--system" && next) {
+      systemOverride = next;
+      i++;
+    } else if (arg === "--headless" && next && !next.startsWith("--")) {
+      prompt = next;
+      i++;
+    } else if (!arg.startsWith("--")) {
+      prompt = arg;
+    }
+  }
+
+  const isChat = !prompt || args.includes("--chat");
+
+  await runCLI({ prompt, chat: isChat, model, systemOverride });
 }
-
-// Load sessions (or create default tab)
-useSessionStore.getState().loadSessions();
-
-// Import and render App
-const { createCliRenderer } = await import("@opentui/core");
-const { createRoot } = await import("@opentui/react");
-const { App } = await import("./components/App.js");
-const { start } = await import("./index.js");
-
-await start({
-  App,
-  createCliRenderer,
-  createRoot,
-});
