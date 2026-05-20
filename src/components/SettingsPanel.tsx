@@ -6,10 +6,19 @@ import { useAppStore } from "../stores/app.js";
 import { Box } from "./ui/box.js";
 import { Text } from "./ui/text.js";
 
-const PROVIDERS = ["anthropic", "openai", "google", "groq", "mistral", "deepseek"] as const;
+const PROVIDERS = [
+  "anthropic",
+  "openai",
+  "github-models",
+  "google",
+  "groq",
+  "mistral",
+  "deepseek",
+] as const;
 const MODELS: Record<(typeof PROVIDERS)[number], string[]> = {
   anthropic: ["claude-sonnet-4", "claude-opus-4", "claude-haiku-3"],
   openai: ["gpt-4o", "gpt-4o-mini", "o3-mini"],
+  "github-models": ["gpt-4o", "claude-sonnet-4", "Llama-3.3-70B-Instruct", "Mistral-Large"],
   google: ["gemini-2.0-flash", "gemini-2.5-pro"],
   groq: ["llama-3.3-70b", "mixtral-8x7b"],
   mistral: ["mistral-large", "mistral-medium"],
@@ -30,9 +39,9 @@ export function SettingsPanel() {
     if (key.name === "down") {
       setProviderIdx((i) => {
         const next = (i + 1) % PROVIDERS.length;
-        const p = PROVIDERS[next];
+        const p = PROVIDERS[next] as (typeof PROVIDERS)[number];
         setProvider(p);
-        setModel(MODELS[p][0]);
+        setModel(MODELS[p][0] as string);
         return next;
       });
       key.stopPropagation();
@@ -41,9 +50,9 @@ export function SettingsPanel() {
     if (key.name === "up") {
       setProviderIdx((i) => {
         const next = (i - 1 + PROVIDERS.length) % PROVIDERS.length;
-        const p = PROVIDERS[next];
+        const p = PROVIDERS[next] as (typeof PROVIDERS)[number];
         setProvider(p);
-        setModel(MODELS[p][0]);
+        setModel(MODELS[p][0] as string);
         return next;
       });
       key.stopPropagation();

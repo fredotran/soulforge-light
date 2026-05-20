@@ -8,9 +8,13 @@ import type { ModelMessage } from "ai";
 import { stepCountIs, streamText } from "ai";
 import { tools } from "./tools/index.js";
 
-const providerMap: Record<string, (config: { apiKey: string }) => unknown> = {
+const GITHUB_MODELS_BASE_URL = "https://models.inference.ai.azure.com";
+
+const providerMap: Record<string, (config: { apiKey: string; baseURL?: string }) => unknown> = {
   anthropic: createAnthropic,
   openai: createOpenAI,
+  "github-models": (config) =>
+    createOpenAI({ apiKey: config.apiKey, baseURL: GITHUB_MODELS_BASE_URL }),
   google: createGoogleGenerativeAI,
   groq: createGroq,
   mistral: createMistral,
